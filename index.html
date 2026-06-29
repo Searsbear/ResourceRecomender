@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>211 Guided Resource Finder</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
+    <style>
+        /* --- ORIGINAL STYLES PRESERVED --- */
+        :root { 
+            --bg: #0f172a; --card-bg: rgba(30, 41, 59, 0.7); --primary: #06b6d4;
+            --secondary: #2dd4bf; --accent: #22d3ee; --text: #f1f5f9; --muted: #94a3b8;
+        }
+        body { 
+            font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; margin: 0; 
+            background-color: var(--bg); color: var(--text); padding-bottom: 50px;
+            background-image: linear-gradient(rgba(6, 182, 212, 0.05) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(6, 182, 212, 0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+        .header { 
+            position: sticky; top: 0; background: linear-gradient(135deg, #083344, #115e59);
+            color: white; padding: 25px 15px; text-align: center; z-index: 100; 
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.3); border-bottom: 2px solid var(--primary);
+        }
+        h2 { margin: 0; font-size: 1.6rem; font-weight: 900; text-transform: uppercase; letter-spacing: 3px; color: var(--primary); text-shadow: 0 0 10px rgba(6, 182, 212, 0.5); }
+        
+        #stats { font-size: 0.75rem; margin-top: 15px; font-weight: 700; letter-spacing: 1.5px; background: rgba(6, 182, 212, 0.15); color: var(--secondary); display: inline-block; padding: 5px 15px; border-radius: 4px; border: 1px solid rgba(6, 182, 212, 0.3); text-transform: uppercase; }
+        
+        /* --- NEW QUESTIONNAIRE STYLES --- */
+        #questionnaire-container {
+            max-width: 700px;
+            margin: 40px auto;
+            background: var(--card-bg);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+        }
+        .step { display: none; animation: fadeIn 0.4s ease-out; }
+        .step.active { display: block; }
+        .question-title { font-size: 1.4rem; color: var(--secondary); margin-bottom: 20px; font-weight: bold; text-align: center; }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+        .form-control, select {
+            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(6, 182, 212, 0.3);
+            background: rgba(15, 23, 42, 0.8); color: var(--text); font-size: 1rem; outline: none; box-sizing: border-box;
+        }
+        .form-control:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 10px rgba(6, 182, 212, 0.2); }
+        
+        .radio-group { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .radio-card {
+            background: rgba(15, 23, 42, 0.6); border: 2px solid rgba(148, 163, 184, 0.2);
+            border-radius: 10px; padding: 15px; text-align: center; cursor: pointer; transition: all 0.2s;
+        }
+        .radio-card:hover { border-color: var(--primary); background: rgba(6, 182, 212, 0.1); }
+        .radio-card.selected { border-color: var(--secondary); background: rgba(45, 212, 191, 0.2); color: white; font-weight: bold; }
+        
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 30px; }
+        .btn { padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px;}
+        .btn-prev { background: transparent; border: 1px solid var(--muted); color: var(--muted); }
+        .btn-prev:hover { background: rgba(255,255,255,0.1); color: white; }
+        .btn-next { background: var(--primary); color: var(--bg); }
+        .btn-next:hover { background: var(--secondary); box-shadow: 0 0 15px rgba(45, 212, 191, 0.4); }
+        
+        /* --- RESULTS STYLES (Preserved) --- */
+        #results-container { display: none; }
+        #results { padding: 20px; max-width: 950px; margin: auto; display: grid; gap: 25px; }
+        .card { background: var(--card-bg); backdrop-filter: blur(12px); border-radius: 15px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); transition: all 0.3s ease; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .org-header { background: rgba(6, 182, 212, 0.1); padding: 20px; color: var(--primary); font-weight: 800; font-size: 1.3rem; border-bottom: 1px solid rgba(6, 182, 212, 0.2); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .badge-container { display: flex; gap: 5px; flex-wrap: wrap; }
+        .badge { font-size: 0.65rem; font-weight: bold; padding: 4px 8px; border-radius: 12px; border: 1px solid; text-transform: uppercase; }
+        .badge-cat { background: rgba(59, 130, 246, 0.1); color: #60a5fa; border-color: #60a5fa; }
+        .badge-age { background: rgba(45, 212, 191, 0.1); color: var(--secondary); border-color: var(--secondary); }
+        .badge-demo { background: rgba(217, 70, 239, 0.1); color: #d946ef; border-color: #d946ef; }
+        .badge-indig { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border-color: #f59e0b; }
+        .card-body { padding: 20px; font-size: 0.95rem; line-height: 1.8; white-space: pre-wrap; color: #cbd5e1; }
+        .label { color: var(--secondary); font-weight: 800; font-size: 0.7rem; text-transform: uppercase; display: inline-block; margin-top: 18px; background: rgba(45, 212, 191, 0.1); padding: 3px 12px; border-radius: 4px; border-left: 3px solid var(--secondary); }
+        a { color: var(--secondary); text-decoration: underline; transition: opacity 0.2s; }
+        a:hover { opacity: 0.8; color: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2>Resource Guide</h2>
+        <div id="stats">Initializing Database...</div>
+    </div>
+
+    <!-- WIZARD INTERFACE -->
+    <div id="questionnaire-container">
+        
+        <!-- Step 1: Basics -->
+        <div id="step-1" class="step active">
+            <div class="question-title">Let's start with the basics</div>
+            <div class="form-group">
+                <label>Your Age</label>
+                <input type="number" id="q-age" class="form-control" placeholder="e.g. 35" min="0" max="120">
+            </div>
+            <div class="form-group">
+                <label>Location (Borough)</label>
+                <select id="q-location">
+                    <option value="any">Anywhere in Montreal</option>
+                    <!-- Populated via JS -->
+                </select>
+                <small style="color:var(--muted); font-size:0.8em; margin-top:5px; display:block;">*Postal code radius search is currently unavailable for text-only databases.</small>
+            </div>
+            <div class="nav-buttons">
+                <div></div>
+                <button class="btn btn-next" onclick="nextStep(1, 2)">Next ➔</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Known Service vs Narrow Further -->
+        <div id="step-2" class="step">
+            <div class="question-title">Do you know what you are looking for?</div>
+            <div class="radio-group">
+                <div class="radio-card" onclick="selectRadio(this, 'q-known', 'yes')">Yes, direct me to a specific service</div>
+                <div class="radio-card" onclick="selectRadio(this, 'q-known', 'no')">No, help me narrow it down</div>
+            </div>
+            <div id="specific-service-dropdown" style="display:none; margin-top: 20px;">
+                <label>Select Category:</label>
+                <select id="q-specific-category" class="form-control">
+                    <option value="">-- Choose --</option>
+                    <!-- Populated via JS -->
+                </select>
+            </div>
+            <div class="nav-buttons">
+                <button class="btn btn-prev" onclick="prevStep(2, 1)">🡠 Back</button>
+                <button class="btn btn-next" onclick="handleKnownServiceStep()">Next ➔</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Demographics -->
+        <div id="step-3" class="step">
+            <div class="question-title">A bit about you</div>
+            
+            <div class="form-group">
+                <label>Do you have children?</label>
+                <div class="radio-group">
+                    <div class="radio-card" onclick="selectRadio(this, 'q-kids', 'yes')">Yes</div>
+                    <div class="radio-card" onclick="selectRadio(this, 'q-kids', 'no')">No</div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Are you an immigrant or newcomer?</label>
+                <div class="radio-group">
+                    <div class="radio-card" onclick="selectRadio(this, 'q-immigrant', 'yes')">Yes</div>
+                    <div class="radio-card" onclick="selectRadio(this, 'q-immigrant', 'no')">No</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Do you identify as Indigenous?</label>
+                <div class="radio-group">
+                    <div class="radio-card" onclick="selectRadio(this, 'q-indigenous', 'yes')">Yes</div>
+                    <div class="radio-card" onclick="selectRadio(this, 'q-indigenous', 'no')">No</div>
+                </div>
+            </div>
+
+            <div class="nav-buttons">
+                <button class="btn btn-prev" onclick="prevStep(3, 2)">🡠 Back</button>
+                <button class="btn btn-next" onclick="nextStep(3, 4)">Next ➔</button>
+            </div>
+        </div>
+
+        <!-- Step 4: Relationship -->
+        <div id="step-4" class="step">
+            <div class="question-title">Relationship Status</div>
+            <p style="color:var(--muted); font-size:0.9rem; text-align:center;">This helps us connect you to specialized support systems if needed.</p>
+            <div class="form-group">
+                <select id="q-relationship" class="form-control">
+                    <option value="single">Single</option>
+                    <option value="relationship">In a relationship / Married</option>
+                    <option value="toxic">It's complicated / Toxic relationship</option>
+                </select>
+            </div>
+            <div class="nav-buttons">
+                <button class="btn btn-prev" onclick="prevStep(4, 3)">🡠 Back</button>
+                <button class="btn btn-next" onclick="nextStep(4, 5)">Next ➔</button>
+            </div>
+        </div>
+
+        <!-- Step 5: Housing -->
+        <div id="step-5" class="step">
+            <div class="question-title">Housing Status</div>
+            <div class="radio-group">
+                <div class="radio-card" onclick="selectRadio(this, 'q-housing', 'housed')">Housed (or Couch Surfing)</div>
+                <div class="radio-card" onclick="selectRadio(this, 'q-housing', 'streets')">No Housing / On the streets</div>
+            </div>
+            <div class="nav-buttons">
+                <button class="btn btn-prev" onclick="prevStep(5, 4)">🡠 Back</button>
+                <button class="btn btn-next" onclick="handleHousingStep()">Next ➔</button>
+            </div>
+        </div>
+
+        <!-- Step 6: Education, Employment & Status (Skipped if Homeless) -->
+        <div id="step-6" class="step">
+            <div class="question-title">Education & Finances</div>
+            
+            <div class="form-group">
+                <label>Employment / Student Status</label>
+                <select id="q-employment" class="form-control">
+                    <option value="none">None of the above</option>
+                    <option value="student">Student</option>
+                    <option value="unemployed">Unemployed</option>
+                    <option value="employed">Employed (seeking assistance)</option>
+                    <option value="assistance">Unemployed receiving government assistance</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Education Level</label>
+                <select id="q-education" class="form-control">
+                    <option value="none">No diploma</option>
+                    <option value="highschool">High-school</option>
+                    <option value="cegep">Cegep</option>
+                    <option value="university">University</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Personal Finance Range (Monthly)</label>
+                <select id="q-finance" class="form-control">
+                    <option value="none">Prefer not to specify</option>
+                    <option value="low">Under $1000</option>
+                    <option value="mid">$1000 - $2500</option>
+                    <option value="high">Over $2500</option>
+                </select>
+            </div>
+
+            <div class="nav-buttons">
+                <button class="btn btn-prev" onclick="prevStep(6, 5)">🡠 Back</button>
+                <button class="btn btn-next" onclick="nextStep(6, 7)">Next ➔</button>
+            </div>
+        </div>
+
+        <!-- Step 7: Transport & Health (Skipped if Homeless) -->
+        <div id="step-7" class="step">
+            <div class="question-title">Transport, Health & Legal</div>
+            
+            <div class="form-group">
+                <label>Do you have access to a car?</label>
+                <div class="radio-group">
+                    <div class="radio-card" onclick="selectRadio(this, 'q-car', 'yes')">Yes, I have a car</div>
+                    <div class="radio-card" onclick="selectRadio(this, 'q-car', 'no')">No car</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Do you have a valid driver's license?</label>
+                <div class="radio-group">
+                    <div class="radio-card" onclick="selectRadio(this, 'q-license', 'yes')">Yes, I have a license</div>
+                    <div class="radio-card" onclick="selectRadio(this, 'q-license', 'no')">No license</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Are you seeking support for mental health or addiction?</label>
+                <div class="radio-group">
+                    <div class="radio-card" onclick="selectRadio(this, 'q-mental', 'yes')">Yes</div>
+                    <div class="radio-card" onclick="selectRadio(this, 'q-mental', 'no')">No</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Do you have a legal or criminal history issue you need help with?</label>
+                <div class="radio-group">
+                    <div class="radio-card" onclick="selectRadio(this, 'q-legal', 'yes')">Yes</div>
+                    <div class="radio-card" onclick="selectRadio(this, 'q-legal', 'no')">No</div>
+                </div>
+            </div>
+
+            <div class="nav-buttons">
+                <button class="btn btn-prev" onclick="prevStep(7, 6)">🡠 Back</button>
+                <button class="btn btn-next" onclick="nextStep(7, 8)">Next ➔</button>
+            </div>
+        </div>
+
+        <!-- Step 8: Food -->
+        <div id="step-8" class="step">
+            <div class="question-title">Food Resources</div>
+            <div class="form-group">
+                <label>Do you need immediate food assistance?</label>
+                <div class="radio-group">
+                    <div class="radio-card" onclick="selectRadio(this, 'q-food', 'yes')">Yes, need food assistance</div>
+                    <div class="radio-card" onclick="selectRadio(this, 'q-food', 'no')">No, I have food</div>
+                </div>
+            </div>
+            <div class="nav-buttons">
+                <!-- If they came from housing=streets, back button goes to 5, else 7 -->
+                <button class="btn btn-prev" onclick="prevStep(8, getFoodBackStep())">🡠 Back</button>
+                <button class="btn btn-next" onclick="submitQuestionnaire()">Find Resources ➔</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- RESULTS CONTAINER -->
+    <div id="results-container">
+        <div style="text-align:center; margin-top:20px;">
+            <button class="btn btn-prev" onclick="restartQuestionnaire()">⟲ Restart Search</button>
+        </div>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. CONFIGURATION 
+        // ==========================================
+        const categoryConfigs = [
+            { id: "Child, Youth and Family", file: "211-repertoire-Child, Youth and Family.pdf" },
+            { id: "Community Action", file: "211-repertoire-Community Action.pdf" },
+            { id: "Disability", file: "211-repertoire-Disability.pdf" },
+            { id: "Food", file: "211-repertoire-Food.pdf" },
+            { id: "Education and Literacy", file: "211-repertoire-Education and Literacy.pdf" },
+            { id: "Employment and Income Support", file: "211-repertoire-Employment and Income Support.pdf" },
+            { id: "Health", file: "211-repertoire-Health.pdf" },
+            { id: "Government services", file: "211-repertoire-Government services.pdf" },
+            { id: "Immigration and cultural communities", file: "211-repertoire-Immigration and cultural communities.pdf" },
+            { id: "Homelessness", file: "211-repertoire-Homelessness.pdf" },
+            { id: "Housing", file: "211-repertoire-Housing.pdf" },
+            { id: "Mental Health and addictions", file: "211-repertoire-Mental Health and addictions.pdf" },
+            { id: "Justice and Advocacy", file: "211-repertoire-Justice and Advocacy.pdf" },
+            { id: "Indigenous Peoples", file: "211-repertoire-Indigenous Peoples.pdf" },
+            { id: "Seniors", file: "211-repertoire-Seniors.pdf" },
+            { id: "Sports, Recreation and Culture", file: "211-repertoire-Sports, Recreation and Culture.pdf" },
+            { id: "Violence and abuse", file: "211-repertoire-Violence and abuse.pdf" },
+            { id: "Thrift store and material aid", file: "211-repertoire-Thrift store and material aid.pdf" },
+            { id: "Sex and gender", file: "211-repertoire-Sex and gender.pdf" },
+            { id: "Transportation", file: "211-repertoire-Transportation.pdf" }
+        ];
+
+        const boroughsList = [
+            "Ahuntsic-Cartierville", "Anjou", "Côte-des-Neiges–Notre-Dame-de-Grâce",
+            "Lachine", "LaSalle", "Le Plateau-Mont-Royal", "Le Sud-Ouest",
+            "L'Île-Bizard–Sainte-Geneviève", "Mercier–Hochelaga-Maisonneuve",
+            "Montréal-Nord", "Outremont", "Pierrefonds-Roxboro",
+            "Rivière-des-Prairies–Pointe-aux-Trembles", "Rosemont–La Petite-Patrie",
+            "Saint-Laurent", "Saint-Léonard", "Verdun", "Ville-Marie",
+            "Villeray–Saint-Michel–Parc-Extension"
+        ];
+
+        // ==========================================
+        // 2. PARSER & STATE 
+        // ==========================================
+        let resources = [];
+        let normalizedBoroughsMap = new Map(); 
+
+        function normalizeText(text) {
+            return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[-–—']/g, " "); 
+        }
+
+        async function loadAllDatabases() {
+            let loadedCount = 0;
+            const statsEl = document.getElementById('stats');
+
+            for (const cat of categoryConfigs) {
+                statsEl.innerText = `LOADING DATABASE: ${loadedCount}/${categoryConfigs.length}...`;
+                try {
+                    const pdf = await pdfjsLib.getDocument(cat.file).promise;
+                    let fullText = "";
+
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+
+                        let pageText = "";
+                        let lastY = -1;
+                        for (let item of textContent.items) {
+                            if (lastY !== -1 && Math.abs(lastY - item.transform[5]) > 4) pageText += '\n'; 
+                            else if (lastY !== -1) pageText += ' '; 
+                            pageText += item.str.trim();
+                            lastY = item.transform[5];
+                        }
+                        fullText += pageText + "\n";
+                    }
+                    processRawText(fullText, cat.id);
+                } catch (error) {
+                    console.warn(`Could not load ${cat.file}`, error);
+                }
+                loadedCount++;
+            }
+            statsEl.innerText = `DATABASE ONLINE | ${resources.length} RESOURCES`;
+        }
+
+        function processRawText(rawText, categoryName) {
+            let cleanText = rawText.replace(/[ \t]{2,}/g, ' ');
+            const splitRegex = /(Legal status:.*?(?:\n|$))/gi;
+            let parts = cleanText.split(splitRegex);
+
+            let rawBlocks = [];
+            for(let i = 0; i < parts.length - 1; i += 2) rawBlocks.push(parts[i] + (parts[i+1] || ""));
+
+            rawBlocks.forEach(block => {
+                let lines = block.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                if (lines.length < 3) return;
+
+                let addressIndex = lines.findIndex(line => 
+                    (/\d/.test(line) && (line.includes('QC') || line.toLowerCase().includes('montréal') || /\b[A-Z]\d[A-Z] ?\d[A-Z]\d\b/i.test(line))) ||
+                    (/^\d{1,5}\s+[A-Za-z]/.test(line) && line.length > 10 && !line.includes(':'))
+                );
+
+                if (addressIndex <= 0) return;
+                let startIndex = addressIndex - 1;
+                while(startIndex > 0 && (lines[startIndex].length < 4 || lines[startIndex].toLowerCase() === categoryName.toLowerCase())) startIndex--;
+
+                let processedLines = lines.slice(startIndex);
+                if (processedLines.length === 0) return;
+
+                const orgName = processedLines[0];
+                const phoneMatch = block.match(/\d{3}[ -]\d{3}-\d{4}/);
+                const fingerPrint = (orgName.substring(0, 30) + (phoneMatch ? phoneMatch[0] : "")).toLowerCase().replace(/[^a-z0-9]/g, '');
+
+                let existingOrg = resources.find(r => r.fingerPrint === fingerPrint);
+                if (existingOrg) {
+                    if (!existingOrg.categories.includes(categoryName)) existingOrg.categories.push(categoryName);
+                } else {
+                    const rawBlock = processedLines.join('\n');
+                    let minAge = 0, maxAge = 120;
+                    const eligMatch = rawBlock.match(/Eligibility:([^\n]+)/i);
+                    const eligText = eligMatch ? eligMatch[1].toLowerCase() : "";
+
+                    if (eligMatch) {
+                        const rangeMatch = eligText.match(/(\d+)\s*(?:to|-)\s*(\d+)/);
+                        if (rangeMatch) { minAge = parseInt(rangeMatch[1]); maxAge = parseInt(rangeMatch[2]); }
+                        else {
+                            const overMatch = eligText.match(/(\d+)\s*(?:years|yrs)?\s*(?:and over|and up|\+)/i);
+                            if (overMatch) minAge = parseInt(overMatch[1]);
+                            else {
+                                const underMatch = eligText.match(/(?:under|<)\s*(\d+)/i);
+                                if (underMatch) maxAge = parseInt(underMatch[1]);
+                            }
+                        }
+                    }
+
+                    let servesWomen = true, servesMen = true, servesChildren = false, servesIndigenous = false;
+                    const mentionsWomen = /\b(women|mothers?|female|girls?|femmes?|mères?|filles?|pregnant|maternity|maternal)\b/.test(eligText);
+                    const mentionsMen = /\b(men|fathers?|male|boys?|hommes?|pères?|garçons?|paternal)\b/.test(eligText);
+
+                    if (mentionsWomen && !mentionsMen && !/\b(people|adults|everyone|anyone|public|families|parents|individuals)\b/.test(eligText)) servesMen = false; 
+                    if (mentionsMen && !mentionsWomen && !/\b(people|adults|everyone|anyone|public|families|parents|individuals)\b/.test(eligText)) servesWomen = false; 
+
+                    if (/\b(children|youth|family|families|parents?|enfants?|jeunes?|familles?|dads?|moms?|toddlers?|babies|baby|teens?|teenagers?|boys?|girls?)\b/.test(eligText) || minAge < 18 || maxAge <= 25) servesChildren = true;
+                    if (/\b(indigenous|aboriginal|first nations|inuit|métis|native|autochtones?)\b/i.test(rawBlock)) servesIndigenous = true;
+
+                    resources.push({ fingerPrint, categories: [categoryName], raw: rawBlock, contentLower: rawBlock.toLowerCase(), contentNormalized: normalizeText(rawBlock), minAge, maxAge, servesWomen, servesMen, servesChildren, servesIndigenous });
+                }
+            });
+        }
+
+        // ==========================================
+        // 3. WIZARD UI LOGIC
+        // ==========================================
+        const userAnswers = {};
+
+        // Populate dropdowns
+        const locSelect = document.getElementById('q-location');
+        boroughsList.forEach(b => {
+            normalizedBoroughsMap.set(b, normalizeText(b));
+            let opt = document.createElement('option'); opt.value = b; opt.text = b; locSelect.add(opt);
+        });
+
+        const catSelect = document.getElementById('q-specific-category');
+        categoryConfigs.forEach(cat => {
+            let opt = document.createElement('option'); opt.value = cat.id; opt.text = cat.id; catSelect.add(opt);
+        });
+
+        function selectRadio(element, category, value) {
+            const siblings = element.parentElement.children;
+            for(let el of siblings) el.classList.remove('selected');
+            element.classList.add('selected');
+            userAnswers[category] = value;
+
+            if (category === 'q-known') {
+                document.getElementById('specific-service-dropdown').style.display = (value === 'yes') ? 'block' : 'none';
+            }
+        }
+
+        function getFoodBackStep() {
+            // If they are on the streets, they skipped 6 & 7 entirely.
+            return userAnswers['q-housing'] === 'streets' ? 5 : 7;
+        }
+
+        function nextStep(current, next) {
+            document.getElementById(`step-${current}`).classList.remove('active');
+            document.getElementById(`step-${next}`).classList.add('active');
+        }
+
+        function prevStep(current, prev) {
+            document.getElementById(`step-${current}`).classList.remove('active');
+            document.getElementById(`step-${prev}`).classList.add('active');
+        }
+
+        function handleKnownServiceStep() {
+            if (userAnswers['q-known'] === 'yes') {
+                const specCat = document.getElementById('q-specific-category').value;
+                if(specCat) {
+                    userAnswers['direct_category'] = specCat;
+                    submitQuestionnaire(); 
+                } else {
+                    alert("Please select a category.");
+                }
+            } else {
+                nextStep(2, 3);
+            }
+        }
+
+        function handleHousingStep() {
+            if (userAnswers['q-housing'] === 'streets') {
+                // Flowchart mapping: No housing -> Streets -> Direct to Housing & Food (Skips Steps 6 and 7)
+                nextStep(5, 8); 
+            } else {
+                nextStep(5, 6);
+            }
+        }
+
+        function restartQuestionnaire() {
+            document.getElementById('results-container').style.display = 'none';
+            document.getElementById('questionnaire-container').style.display = 'block';
+            
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.getElementById('step-1').classList.add('active');
+        }
+
+        // ==========================================
+        // 4. MAPPING ANSWERS TO ENGINE LOGIC
+        // ==========================================
+        function submitQuestionnaire() {
+            document.getElementById('questionnaire-container').style.display = 'none';
+            document.getElementById('results-container').style.display = 'block';
+            
+            const targetCategories = new Set();
+            let reqMinAge = parseInt(document.getElementById('q-age').value);
+            let reqMaxAge = reqMinAge; 
+            if (isNaN(reqMinAge)) { reqMinAge = 0; reqMaxAge = 120; }
+            
+            const reqBorough = document.getElementById('q-location').value;
+
+            if (userAnswers['q-known'] === 'yes' && userAnswers['direct_category']) {
+                targetCategories.add(userAnswers['direct_category']);
+            } else {
+                // Demographics
+                if(userAnswers['q-kids'] === 'yes') targetCategories.add("Child, Youth and Family");
+                if(userAnswers['q-immigrant'] === 'yes') targetCategories.add("Immigration and cultural communities");
+                if(userAnswers['q-indigenous'] === 'yes') targetCategories.add("Indigenous Peoples");
+                
+                // Relationship
+                const rel = document.getElementById('q-relationship').value;
+                if(rel === 'toxic') {
+                    targetCategories.add("Violence and abuse");
+                    targetCategories.add("Housing"); 
+                }
+
+                // Housing
+                if(userAnswers['q-housing'] === 'streets') {
+                    targetCategories.add("Homelessness");
+                    targetCategories.add("Housing");
+                }
+
+                // Health & Status
+                if(userAnswers['q-mental'] === 'yes') targetCategories.add("Mental Health and addictions");
+                
+                // Education & Employment Mapping
+                const emp = document.getElementById('q-employment').value;
+                const edu = document.getElementById('q-education').value;
+
+                if (emp === 'unemployed' || emp === 'assistance') targetCategories.add("Employment and Income Support");
+                
+                if (emp === 'student' || edu === 'none') {
+                    targetCategories.add("Education and Literacy");
+                }
+                
+                if(userAnswers['q-legal'] === 'yes') targetCategories.add("Justice and Advocacy");
+
+                // Transportation Mapping (If no car OR no license)
+                if(userAnswers['q-car'] === 'no' || userAnswers['q-license'] === 'no') {
+                    targetCategories.add("Transportation");
+                }
+
+                // Food
+                if(userAnswers['q-food'] === 'yes') targetCategories.add("Food");
+            }
+
+            // FILTER EXECUTION
+            const results = resources.filter(res => {
+                if (reqMinAge > res.maxAge || reqMaxAge < res.minAge) return false;
+
+                if (reqBorough !== 'any') {
+                    const normBorough = normalizedBoroughsMap.get(reqBorough);
+                    if (!res.contentNormalized.includes(normBorough)) return false;
+                }
+
+                if (targetCategories.size > 0) {
+                    let hasMatchingCategory = false;
+                    for (let cat of targetCategories) {
+                        if (res.categories.includes(cat)) {
+                            hasMatchingCategory = true;
+                            break;
+                        }
+                    }
+                    if (!hasMatchingCategory) return false;
+                }
+
+                return true;
+            });
+
+            document.getElementById('stats').innerText = `FOUND: ${results.length} RELEVANT RESOURCES`;
+            renderCards(results);
+        }
+
+        // ==========================================
+        // 5. RENDERING 
+        // ==========================================
+        function renderCards(list) {
+            const resultsDiv = document.getElementById('results');
+            if (list.length === 0) {
+                resultsDiv.innerHTML = '<div class="welcome" style="text-align:center;">NO MATCHES FOUND FOR THIS PROFILE. <br>Try broadening your answers.</div>';
+                return;
+            }
+
+            resultsDiv.innerHTML = list.slice(0, 50).map(item => { 
+                const lines = item.raw.split('\n');
+                let body = lines.slice(1).join('\n');
+
+                body = body.replace(/(?<!EMAIL: )(?<!">)(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\/[^\s\n]*)?/gi, (url) => `<a href="${url.startsWith('http')?url:'https://'+url}" target="_blank">${url}</a>`);
+                body = body.replace(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi, `<a href="mailto:$1">$1</a>`);
+                body = body.replace(/(\d{3}[ -]\d{3}-\d{4})/g, `<a href="tel:$1" style="font-weight:bold">$1</a>`);
+
+                const labels = ["Services:", "Eligibility:", "Hours:", "Website:", "Email:", "Address:", "Coverage area:", "Fees:", "Financing:", "Legal status:"];
+                labels.forEach(l => body = body.replace(new RegExp(`(${l})`, "g"), `<span class="label">$1</span>`));
+
+                let badges = '';
+                item.categories.forEach(cat => badges += `<span class="badge badge-cat">${cat}</span>`);
+                if (item.minAge > 0 || item.maxAge < 120) badges += `<span class="badge badge-age">${item.minAge}-${item.maxAge} YRS</span>`;
+                if (item.servesWomen && !item.servesMen) badges += `<span class="badge badge-demo">WOMEN ONLY</span>`;
+                if (item.servesMen && !item.servesWomen) badges += `<span class="badge badge-demo" style="color:var(--primary); border-color:var(--primary)">MEN ONLY</span>`;
+                if (item.servesChildren) badges += `<span class="badge badge-demo" style="color:white; border-color:white; background:rgba(255,255,255,0.1)">FAMILIES/YOUTH</span>`;
+                if (item.servesIndigenous) badges += `<span class="badge badge-indig">INDIGENOUS</span>`;
+
+                return `<div class="card">
+                    <div class="org-header">
+                        <span>${lines[0]}</span>
+                        <div class="badge-container">${badges}</div>
+                    </div>
+                    <div class="card-body">${body}</div>
+                </div>`;
+            }).join('');
+        }
+
+        window.onload = loadAllDatabases;
+    </script>
+</body>
+</html>
